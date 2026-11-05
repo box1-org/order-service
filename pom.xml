@@ -17,7 +17,7 @@
         <quarkus.platform.version>3.40.1.1</quarkus.platform.version>
         <skipITs>true</skipITs>
         <!-- box1-ops-contracts commit that contract tests validate against. -->
-        <contracts.ref>56f9df2472f99f17cef03b6a31edd7e8cacb08b9</contracts.ref>
+        <contracts.ref>7dcf2909dfccf6e0009504d6542bdb45a647a68b</contracts.ref>
         <!-- Container-backed tests need a local runtime; the CI task has none. Use -Pcontainers. -->
         <test.excluded.groups>containers</test.excluded.groups>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>

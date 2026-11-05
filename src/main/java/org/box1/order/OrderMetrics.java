@@ -60,6 +60,11 @@ public class OrderMetrics {
         registry.counter("box1_events_consumed", "type", eventType, "outcome", outcome).increment();
     }
 
+    /** Count a retry of an event after a transient failure. */
+    public void retried() {
+        registry.counter("box1_event_retries").increment();
+    }
+
     /** Record the outbox lag of a confirmed publish and count the attempt. */
     public void published(double lagSeconds) {
         registry.counter("box1_outbox_published").increment();

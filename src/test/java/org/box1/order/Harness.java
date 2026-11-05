@@ -38,12 +38,19 @@ final class Harness {
 
     private Harness() {}
 
+    private static boolean brokerPaused;
+
     static void pauseBroker() {
+        brokerPaused = true;
         retrying(() -> FullStackResource.kafka.getDockerClient()
                 .pauseContainerCmd(FullStackResource.kafka.getContainerId()).exec());
     }
 
     static void resumeBroker() {
+        if (!brokerPaused) {
+            return;
+        }
+        brokerPaused = false;
         retrying(() -> FullStackResource.kafka.getDockerClient()
                 .unpauseContainerCmd(FullStackResource.kafka.getContainerId()).exec());
     }
@@ -192,7 +199,7 @@ final class Harness {
 
     static String reserved(String eventId, String orderId) {
         return envelope(eventId, "inventory.reserved.v1", orderId, Map.of("reservationId", "res_" + orderId.substring(4),
-                "sku", "SKU-42", "quantity", 2, "siteId", "site_nyc", "expiresAt", "2026-11-05T13:00:00Z"));
+                "sku", "SKU-42", "quantity", 2, "siteId", "site_nyc", "expiresAt", "2099-01-01T00:00:00Z"));
     }
 
     static String rejected(String eventId, String orderId) {

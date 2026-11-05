@@ -47,9 +47,9 @@ Delivery is **at least once**. A crash after the broker confirms and before the 
 | Failure | Handling |
 |---|---|
 | Malformed envelope, invalid payload, unknown type or unknown order | Straight to `box1.order.dlq.v1` |
-| Database failure | 5 attempts over about 7.5 s, then `box1.order.dlq.v1` |
+| Database failure | Up to 20 attempts over about 7 minutes, holding the channel's position, then `box1.order.dlq.v1` |
 
-A long database outage therefore moves events to the dead-letter topic. Nothing is lost, and they replay safely.
+Holding position keeps per-order order during ordinary outages. An outage longer than the retry budget moves events to the dead-letter topic, and consumption then moves past them. Replay is duplicate-safe but can apply an event after later ones, which is why a replayed reservation past its `expiresAt` moves the order to `EXCEPTION` rather than requesting fulfillment. A reservation whose `sku`, `quantity` or `siteId` differs from the order does the same.
 
 ## Kafka unavailable
 

@@ -14,7 +14,11 @@ public record LifecycleEvent(
         String reservationId,
         String fulfillmentRequestId,
         boolean retryable,
-        String reasonCode) {
+        String reasonCode,
+        String sku,
+        Integer quantity,
+        String siteId,
+        Instant expiresAt) {
 
     public static final String RESERVED = "inventory.reserved.v1";
     public static final String REJECTED = "inventory.rejected.v1";

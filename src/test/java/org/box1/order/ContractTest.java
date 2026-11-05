@@ -87,6 +87,10 @@ class ContractTest {
             Harness.reserved(Harness.id(), "ord_1").replace("\"schemaVersion\":1", "\"schemaVersion\":2"),
             Harness.reserved(Harness.id(), "ord_1").replace("\"aggregateId\":\"ord_1\"", "\"aggregateId\":\"ord_2\""),
             Harness.reserved(Harness.id(), "ord_1").replace("00-4bf9", "99-4bf9"),
+            Harness.reserved(Harness.id(), "ord_1").replace("\"quantity\":2", "\"quantity\":0"),
+            Harness.reserved(Harness.id(), "ord_1").replace("\"sku\":\"SKU-42\",", ""),
+            Harness.rejected(Harness.id(), "ord_1").replace("INSUFFICIENT_STOCK", "free text with data"),
+            Harness.shipped(Harness.id(), "ord_1").replace("shp_1", "other"),
         };
         for (String value : bad) {
             Assertions.assertThrows(PoisonEventException.class, () -> parser.parse(value), value);

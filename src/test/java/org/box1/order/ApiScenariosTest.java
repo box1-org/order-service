@@ -48,6 +48,14 @@ class ApiScenariosTest {
     }
 
     @Test
+    void firstResponseAndLaterReadsCarryTheSameTimestamps() {
+        Response created = post(UUID.randomUUID().toString(), body("cust_time"));
+        String orderId = created.path("orderId");
+        given().when().get("/api/v1/orders/" + orderId).then().statusCode(200)
+                .body("createdAt", is((String) created.path("createdAt")));
+    }
+
+    @Test
     void sameKeyWithChangedBodyConflicts() {
         String key = UUID.randomUUID().toString();
         post(key, body("cust_conflict")).then().statusCode(201);
@@ -157,13 +165,15 @@ class ApiScenariosTest {
             valid.replace("cust_valid", "nope"), valid.replace("\"quantity\":2", "\"quantity\":0"),
             valid.replace("\"quantity\":2", "\"quantity\":\"2\""), valid.replace("\"quantity\":2", "\"quantity\":2.5"),
             valid.replace("site_nyc", "nyc"), valid.replace("SKU-42", ""), valid.replace("}", ",\"extra\":1}"),
-            "{not json", "null",
+            "{not json", "null", valid.replace("cust_valid", "cust_" + "x".repeat(60)),
+            valid.replace("site_nyc", "site_" + "x".repeat(60)), valid.replace("SKU-42", "a\\u0000b"),
         };
         for (String body : invalid) {
             post(UUID.randomUUID().toString(), body).then().statusCode(400)
                     .contentType(startsWith("application/problem+json")).body("status", is(400));
         }
         post("k".repeat(256), valid).then().statusCode(400);
+        post(UUID.randomUUID().toString(), valid.replace("cust_valid", "cust_" + "x".repeat(20000))).then().statusCode(413);
         given().when().get("/api/v1/orders/ord_missing").then().statusCode(404)
                 .contentType(startsWith("application/problem+json")).body("title", is("Not Found"));
         given().when().get("/api/v1/orders/ord_missing/timeline").then().statusCode(404);

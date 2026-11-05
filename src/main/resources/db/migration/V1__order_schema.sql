@@ -16,7 +16,6 @@ CREATE TABLE orders (
 );
 CREATE INDEX ix_orders_open_updated ON orders (updated_at)
     WHERE state IN ('SUBMITTED','RESERVED','FULFILLMENT_REQUESTED');
-CREATE INDEX ix_orders_state ON orders (state);
 
 CREATE TABLE order_state_history (
     seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -70,7 +69,7 @@ CREATE TABLE outbox (
     claim_expires_at timestamptz NULL,
     last_error text NULL
 );
-CREATE INDEX ix_outbox_unpublished ON outbox (next_attempt_at, seq) WHERE published_at IS NULL;
+CREATE INDEX ix_outbox_unpublished ON outbox (seq) WHERE published_at IS NULL;
 CREATE INDEX ix_outbox_aggregate_unpublished ON outbox (aggregate_id, seq) WHERE published_at IS NULL;
 -- Database-level guard: these events are emitted at most once per order.
 CREATE UNIQUE INDEX ux_outbox_once_per_order ON outbox (aggregate_id, event_type)

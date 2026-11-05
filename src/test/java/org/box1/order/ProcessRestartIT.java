@@ -124,25 +124,35 @@ class ProcessRestartIT {
     void killWhileClaimingPublishesAfterLeaseExpiry() throws Exception {
         App first = start();
         Harness.pauseBroker();
-        String orderId;
+        App second = null;
         try {
-            orderId = create(first);
-            String waiting = orderId;
-            Harness.await("an active claim", () -> Harness.count("SELECT count(*) FROM outbox WHERE aggregate_id = ? AND claimed_by IS NOT NULL", waiting) == 1);
+            String orderId = create(first);
+            for (int i = 0; i < 4; i++) {
+                create(first);
+            }
+            Harness.await("an active claim", () -> Harness.count("SELECT count(*) FROM outbox WHERE aggregate_id = ? AND claimed_by IS NOT NULL", orderId) == 1);
             first.kill();
             assertEquals(1, Harness.count("SELECT count(*) FROM outbox WHERE aggregate_id = ? AND published_at IS NULL", orderId));
-        } finally {
+            // A cold start with no broker metadata must keep failing fast rather than outlast its lease.
+            second = start();
+            App running = second;
+            Harness.await("a failed attempt from the restarted publisher", () -> {
+                try {
+                    return Files.readString(running.log()).contains("Outbox publish not confirmed");
+                } catch (IOException error) {
+                    return false;
+                }
+            });
             Harness.resumeBroker();
-        }
-        App second = start();
-        try {
-            String published = orderId;
-            Harness.await("publish after restart", () -> Harness.count("SELECT count(*) FROM outbox WHERE aggregate_id = ? AND published_at IS NOT NULL", published) == 1);
+            Harness.await("publish after restart", AFTER_KILL, () -> Harness.count("SELECT count(*) FROM outbox WHERE aggregate_id = ? AND published_at IS NOT NULL", orderId) == 1);
             List<JsonNode> events = Harness.orderEvents(orderId, Duration.ofSeconds(3));
             assertTrue(events.size() >= 1);
             assertEquals(1, events.stream().map(e -> e.get("eventId").asText()).distinct().count(), "one logical event");
         } finally {
-            second.kill();
+            Harness.resumeBroker();
+            if (second != null) {
+                second.kill();
+            }
         }
     }
 

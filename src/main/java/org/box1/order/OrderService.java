@@ -1,6 +1,7 @@
 package org.box1.order;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,7 @@ public class OrderService {
     public CreateResult create(CreateCommand command) {
         String hash = Fingerprint.of(command.customerId(), command.sku(), command.quantity(), command.siteId());
         String orderId = "ord_" + UUID.randomUUID().toString().replace("-", "");
-        Instant now = Instant.now();
+        Instant now = now();
         if (!store.claimKey(command.scope(), command.idempotencyKey(), hash, orderId, now)) {
             OrderStore.KeyRecord existing = store.findKey(command.scope(), command.idempotencyKey())
                     .orElseThrow(() -> new IllegalStateException("Idempotency record vanished"));
@@ -68,13 +69,13 @@ public class OrderService {
     /** Apply one event exactly once per eventId, in one transaction with its dedupe record and outbox rows. */
     @Transactional
     public Applied apply(LifecycleEvent event) {
-        Instant now = Instant.now();
-        if (!store.markProcessed(event.eventId(), event.eventType(), now)) {
+        if (!store.markProcessed(event.eventId(), event.eventType(), now())) {
             return new Applied("duplicate", List.of());
         }
         Order order = store.lock(event.orderId()).orElseThrow(() -> new PoisonEventException("Unknown order"));
-        Transitions.Decision decision = Transitions.decide(order.state(), event, policy, order.fulfillmentRequestId(),
-                order.reservationId());
+        // Read after the row lock, so a transaction that waited cannot write an earlier time than the one before it.
+        Instant now = now();
+        Transitions.Decision decision = Transitions.decide(order, event, policy, now);
         String causation = event.eventId().toString();
         SpanContext span = Span.current().getSpanContext();
         String traceId = span.isValid() ? span.getTraceId() : order.traceId();
@@ -106,6 +107,11 @@ public class OrderService {
     /** Read an order. */
     public Optional<Order> find(String orderId) {
         return store.find(orderId);
+    }
+
+    /** Microseconds, matching timestamptz, so a first response and later reads carry the same value. */
+    private static Instant now() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     private static String traceparent() {

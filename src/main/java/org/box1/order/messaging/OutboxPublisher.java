@@ -22,6 +22,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.box1.order.OrderMetrics;
 import org.box1.order.store.OutboxStore;
+import org.box1.order.store.StoreException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -91,9 +92,14 @@ public class OutboxPublisher {
                 continue;
             }
             try {
-                sending.add(new Sending(row, producer.send(record(row))));
-            } catch (KafkaException error) {
+                Future<RecordMetadata> future = producer.send(record(row));
+                sending.add(new Sending(row, future));
+                // A metadata timeout comes back as an already failed future, not a thrown exception.
                 // Waiting on metadata for every row would outlast the lease, so the rest fail fast.
+                if (future.isDone() && failed(future)) {
+                    brokerAvailable = false;
+                }
+            } catch (KafkaException error) {
                 brokerAvailable = false;
                 sending.add(new Sending(row, null));
             }
@@ -104,6 +110,18 @@ public class OutboxPublisher {
             published += confirm(item) ? 1 : 0;
         }
         return published;
+    }
+
+    private static boolean failed(Future<RecordMetadata> future) {
+        try {
+            future.get();
+            return false;
+        } catch (ExecutionException error) {
+            return true;
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return true;
+        }
     }
 
     private boolean confirm(Sending item) {
@@ -123,6 +141,9 @@ public class OutboxPublisher {
             fail(row, error);
         } catch (ExecutionException | TimeoutException | KafkaException error) {
             fail(row, error);
+        } catch (StoreException error) {
+            // The broker has this event. The lease expires and it resends, which consumers dedupe.
+            LOG.warnv("Unable to mark a published event: eventId={0} orderId={1}", row.eventId(), row.aggregateId());
         }
         return false;
     }
@@ -131,8 +152,13 @@ public class OutboxPublisher {
         String type = error instanceof ExecutionException && error.getCause() != null
                 ? error.getCause().getClass().getSimpleName() : error.getClass().getSimpleName();
         metrics.publishFailed();
-        outbox.release(row.eventId(), owner, backoff(row.attempts()), type);
-        LOG.warnv("Outbox publish not confirmed: eventId={0} attempts={1} error={2}", row.eventId(), row.attempts(), type);
+        try {
+            outbox.release(row.eventId(), owner, backoff(row.attempts()), type);
+        } catch (StoreException storeError) {
+            LOG.warnv("Unable to release a claim, so its lease must expire: eventId={0}", row.eventId());
+        }
+        LOG.warnv("Outbox publish not confirmed: eventId={0} orderId={1} attempts={2} error={3}", row.eventId(),
+                row.aggregateId(), row.attempts(), type);
     }
 
     /** Exponential backoff from the configured base, capped. Publishing never gives up on a committed event. */

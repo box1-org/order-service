@@ -137,6 +137,24 @@ class SagaScenariosTest {
     }
 
     @Test
+    void reservationForDifferentContentNeedsReconciliationAndRequestsNothing() {
+        String orderId = newOrder();
+        send(INVENTORY_TOPIC, orderId, reserved(id(), orderId).replace("\"quantity\":2", "\"quantity\":1"));
+        awaitState(orderId, "EXCEPTION");
+        assertTrue(reasons(orderId).contains("RESERVATION_MISMATCH"));
+        assertEquals(0, count(FULFILLMENT, orderId));
+    }
+
+    @Test
+    void replayedReservationPastItsExpiryRequestsNothing() {
+        String orderId = newOrder();
+        send(INVENTORY_TOPIC, orderId, reserved(id(), orderId).replace("2099-01-01T00:00:00Z", "2020-01-01T00:00:00Z"));
+        awaitState(orderId, "EXCEPTION");
+        assertTrue(reasons(orderId).contains("RESERVATION_EXPIRED"));
+        assertEquals(0, count(FULFILLMENT, orderId));
+    }
+
+    @Test
     void malformedAndUnknownEventsGoToTheDeadLetterTopicAndDoNotStopConsumption() {
         String badKey = "bad-" + id();
         send(INVENTORY_TOPIC, badKey, "{not json");
@@ -170,6 +188,9 @@ class SagaScenariosTest {
         try {
             send(INVENTORY_TOPIC, orderId, value);
             Harness.await("dead letter", () -> !dlq(orderId).isEmpty());
+            ConsumerRecord<String, String> sent = dlq(orderId).get(0);
+            assertEquals("Retries exhausted", header(sent, "dead-letter-reason"));
+            assertTrue(header(sent, "dead-letter-cause") == null, "no driver text in dead-letter headers");
         } finally {
             exec("DROP TRIGGER fail_processed_trigger ON processed_event");
         }

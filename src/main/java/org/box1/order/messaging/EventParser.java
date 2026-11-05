@@ -17,9 +17,13 @@ import org.box1.order.domain.LifecycleEvent;
  */
 @ApplicationScoped
 public class EventParser {
-    private static final Pattern ORDER = Pattern.compile("^ord_[A-Za-z0-9_-]+$");
-    private static final Pattern RESERVATION = Pattern.compile("^res_[A-Za-z0-9_-]+$");
-    private static final Pattern FULFILLMENT = Pattern.compile("^ful_[A-Za-z0-9_-]+$");
+    private static final Pattern ORDER = Pattern.compile("^ord_[A-Za-z0-9_-]{1,124}$");
+    private static final Pattern RESERVATION = Pattern.compile("^res_[A-Za-z0-9_-]{1,124}$");
+    private static final Pattern FULFILLMENT = Pattern.compile("^ful_[A-Za-z0-9_-]{1,124}$");
+    private static final Pattern SHIPMENT = Pattern.compile("^shp_[A-Za-z0-9_-]{1,124}$");
+    private static final Pattern SITE = Pattern.compile("^site_[A-Za-z0-9_-]{1,120}$");
+    private static final Pattern SKU = Pattern.compile("^[^\\p{Cntrl}]{1,80}$");
+    private static final Pattern REASON = Pattern.compile("^[A-Z][A-Z0-9_]{0,63}$");
     private static final Pattern TRACEPARENT = Pattern.compile("^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$");
     private static final int MAX_ID = 128;
 
@@ -57,24 +61,36 @@ public class EventParser {
         String fulfillmentRequestId = null;
         boolean retryable = false;
         String reasonCode = null;
+        String sku = null;
+        Integer quantity = null;
+        String siteId = null;
+        Instant expiresAt = null;
         switch (type) {
             case LifecycleEvent.RESERVED -> {
                 reservationId = matching(payload, "reservationId", RESERVATION);
-                instant(payload, "expiresAt");
+                expiresAt = instant(payload, "expiresAt");
+                sku = matching(payload, "sku", SKU);
+                quantity = quantity(payload);
+                siteId = matching(payload, "siteId", SITE);
             }
-            case LifecycleEvent.REJECTED -> reasonCode = text(payload, "reasonCode");
+            case LifecycleEvent.REJECTED -> {
+                reasonCode = matching(payload, "reasonCode", REASON);
+                sku = matching(payload, "sku", SKU);
+                quantity = quantity(payload);
+                siteId = matching(payload, "siteId", SITE);
+            }
             case LifecycleEvent.EXPIRED -> {
                 reservationId = matching(payload, "reservationId", RESERVATION);
                 instant(payload, "expiredAt");
             }
             case LifecycleEvent.SHIPPED -> {
                 fulfillmentRequestId = matching(payload, "fulfillmentRequestId", FULFILLMENT);
-                text(payload, "shipmentId");
+                matching(payload, "shipmentId", SHIPMENT);
                 instant(payload, "shippedAt");
             }
             case LifecycleEvent.FAILED -> {
                 fulfillmentRequestId = matching(payload, "fulfillmentRequestId", FULFILLMENT);
-                reasonCode = text(payload, "reasonCode");
+                reasonCode = matching(payload, "reasonCode", REASON);
                 if (!payload.path("retryable").isBoolean()) {
                     throw new PoisonEventException("Missing retryable");
                 }
@@ -83,7 +99,15 @@ public class EventParser {
             default -> throw new PoisonEventException("Unsupported eventType");
         }
         return new LifecycleEvent(eventId, type, orderId, occurredAt, correlationId, traceparent, reservationId,
-                fulfillmentRequestId, retryable, reasonCode);
+                fulfillmentRequestId, retryable, reasonCode, sku, quantity, siteId, expiresAt);
+    }
+
+    private static Integer quantity(JsonNode payload) {
+        JsonNode value = payload.get("quantity");
+        if (value == null || !value.canConvertToInt() || !value.isIntegralNumber() || value.asInt() < 1) {
+            throw new PoisonEventException("Invalid quantity");
+        }
+        return value.asInt();
     }
 
     private JsonNode read(String value) {

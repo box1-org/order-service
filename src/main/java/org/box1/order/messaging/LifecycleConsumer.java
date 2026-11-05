@@ -1,5 +1,6 @@
 package org.box1.order.messaging;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -47,28 +48,36 @@ public class LifecycleConsumer {
     private final Tracer tracer;
     private final int maxAttempts;
     private final long initialBackoffMillis;
+    private final long maxBackoffMillis;
 
     public LifecycleConsumer(EventParser parser, OrderService orders, OrderMetrics metrics, Tracer tracer,
             @ConfigProperty(name = "order.consumer.max-attempts") int maxAttempts,
-            @ConfigProperty(name = "order.consumer.initial-backoff-millis") long initialBackoffMillis) {
+            @ConfigProperty(name = "order.consumer.initial-backoff-millis") long initialBackoffMillis,
+            @ConfigProperty(name = "order.consumer.max-backoff-millis") long maxBackoffMillis) {
         this.parser = parser;
         this.orders = orders;
         this.metrics = metrics;
         this.tracer = tracer;
         this.maxAttempts = maxAttempts;
         this.initialBackoffMillis = initialBackoffMillis;
+        this.maxBackoffMillis = maxBackoffMillis;
     }
 
     @Incoming("inventory-events")
     @Blocking
-    void onInventory(ConsumerRecord<String, String> record) {
-        process(record.value());
+    void onInventory(ConsumerRecord<String, byte[]> record) {
+        process(text(record));
     }
 
     @Incoming("fulfillment-events")
     @Blocking
-    void onFulfillment(ConsumerRecord<String, String> record) {
-        process(record.value());
+    void onFulfillment(ConsumerRecord<String, byte[]> record) {
+        process(text(record));
+    }
+
+    /** Bytes stay raw on the channel, so a dead-lettered record is exactly what arrived. */
+    private static String text(ConsumerRecord<String, byte[]> record) {
+        return record.value() == null ? null : new String(record.value(), StandardCharsets.UTF_8);
     }
 
     private void process(String value) {
@@ -96,7 +105,11 @@ public class LifecycleConsumer {
             span.recordException(error);
             metrics.consumed(event.eventType(), "dead_lettered");
             LOG.warnv("Dead-lettering event: {0}", error.getClass().getSimpleName());
-            throw error;
+            if (error instanceof PoisonEventException) {
+                throw error;
+            }
+            // Fixed text: this message and any cause reach dead-letter headers.
+            throw new PoisonEventException("Retries exhausted");
         } finally {
             span.end();
             MDC.remove("orderId");
@@ -121,9 +134,10 @@ public class LifecycleConsumer {
                 if (attempt >= maxAttempts) {
                     throw error;
                 }
+                metrics.retried();
                 LOG.warnv("Retrying event: attempt={0} error={1}", attempt, error.getClass().getSimpleName());
                 sleep(backoff);
-                backoff *= 2;
+                backoff = Math.min(backoff * 2, maxBackoffMillis);
             }
         }
     }

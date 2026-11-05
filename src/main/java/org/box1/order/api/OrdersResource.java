@@ -36,13 +36,13 @@ import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 @Produces(MediaType.APPLICATION_JSON)
 public class OrdersResource {
     private static final Logger LOG = Logger.getLogger(OrdersResource.class);
-    private static final Pattern CUSTOMER = Pattern.compile("^cust_[A-Za-z0-9_-]+$");
-    private static final Pattern SITE = Pattern.compile("^site_[A-Za-z0-9_-]+$");
-    private static final Pattern ORDER = Pattern.compile("^ord_[A-Za-z0-9_-]+$");
+    private static final Pattern CUSTOMER = Pattern.compile("^cust_[A-Za-z0-9_-]{1,59}$");
+    private static final Pattern SITE = Pattern.compile("^site_[A-Za-z0-9_-]{1,59}$");
+    private static final Pattern ORDER = Pattern.compile("^ord_[A-Za-z0-9_-]{1,124}$");
     private static final Pattern SCOPE = Pattern.compile("^[A-Za-z0-9_.-]{1,64}$");
     private static final Pattern CORRELATION = Pattern.compile("^[A-Za-z0-9_.:-]{1,128}$");
     private static final int MAX_KEY = 255;
-    private static final int MAX_SKU = 80;
+    private static final Pattern SKU = Pattern.compile("^[^\\p{Cntrl}]{1,80}$");
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
@@ -157,7 +157,7 @@ public class OrdersResource {
         if (body.customerId() == null || !CUSTOMER.matcher(body.customerId()).matches()) {
             throw badRequest("customerId is invalid");
         }
-        if (body.sku() == null || body.sku().isEmpty() || body.sku().length() > MAX_SKU) {
+        if (body.sku() == null || !SKU.matcher(body.sku()).matches()) {
             throw badRequest("sku is invalid");
         }
         if (body.quantity() == null || body.quantity() < 1) {
