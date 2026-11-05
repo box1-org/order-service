@@ -14,9 +14,6 @@ metadata:
     box1.org/template-version: "1.1.0"
   tags: [java, quarkus, maven, tekton, gitops]
   links:
-    - url: https://github.com/box1-org/order-service
-      title: Source Repository
-      icon: github
     - url: https://order-service-dev.apps.ocp.box1.org/q/swagger-ui/
       title: Swagger UI — test endpoints
       icon: code
