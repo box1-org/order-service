@@ -1,0 +1,55 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: order-service
+  description: "Transactional state of customer requested orders"
+  annotations:
+    github.com/project-slug: box1-org/order-service
+    backstage.io/kubernetes-id: order-service
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/source-location: url:https://github.com/box1-org/order-service/
+    janus-idp.io/tekton: order-service
+    argocd/instance-name: openshift-gitops
+    argocd/app-selector: backstage.io/kubernetes-id=order-service
+    box1.org/template-version: "1.1.0"
+  tags: [java, quarkus, maven, tekton, gitops]
+  links:
+    - url: https://github.com/box1-org/order-service
+      title: Source Repository
+      icon: github
+    - url: https://order-service-dev.apps.ocp.box1.org/q/swagger-ui/
+      title: Swagger UI — test endpoints
+      icon: code
+    - url: https://order-service-dev.apps.ocp.box1.org/q/openapi
+      title: OpenAPI specification
+      icon: code
+    - url: https://order-service-dev.apps.ocp.box1.org
+      title: Application Route (after first release)
+    - url: https://github.com/box1-org/box1-workloads-dev/tree/main/workloads/order-service
+      title: Desired deployment configuration
+    - url: https://devspaces.apps.ocp.box1.org/#https://github.com/box1-org/order-service
+      title: Open in Dev Spaces
+      icon: code
+    # Add actual service-specific observability URLs
+    # when dashboards and log views exist.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: "user:default/mike4263"
+  # Add when the corresponding System entity exists:
+  # system: box1-demo
+  providesApis:
+    - order-service-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: order-service-api
+  description: OpenAPI contract for order-service
+  tags: [quarkus, openapi]
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: "user:default/mike4263"
+  definition:
+    $text: https://order-service-dev.apps.ocp.box1.org/q/openapi
