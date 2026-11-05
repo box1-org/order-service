@@ -6,7 +6,6 @@ import static org.box1.order.Harness.count;
 import static org.box1.order.Harness.exec;
 import static org.box1.order.Harness.post;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -37,10 +36,11 @@ class ApiScenariosTest {
     void tenIdenticalPostsMakeOneOrderAndOneOutboxEvent() {
         String key = UUID.randomUUID().toString();
         Response first = post(key, body("cust_ten"));
-        first.then().statusCode(201).header("Location", endsWith("/api/v1/orders/" + first.path("orderId")));
+        first.then().statusCode(201).header("Location", equalTo("/api/v1/orders/" + first.path("orderId")));
         String orderId = first.path("orderId");
         for (int i = 0; i < 9; i++) {
             post(key, body("cust_ten")).then().statusCode(200).header("Idempotency-Replayed", "true")
+                    .header("Location", equalTo("/api/v1/orders/" + orderId))
                     .body("orderId", equalTo(orderId));
         }
         assertEquals(1, count("SELECT count(*) FROM orders WHERE customer_id = 'cust_ten'"));
