@@ -2,5 +2,7 @@ site_name: order-service
 site_description: "Transactional state of customer requested orders"
 nav:
   - Home: index.md
+  - Architecture: architecture.md
+  - Runbook: runbook.md
 plugins:
   - techdocs-core

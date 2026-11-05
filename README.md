@@ -1,15 +1,47 @@
 # order-service
 
-Transactional state of customer requested orders
+Transactional state of customer requested orders: order commands, authoritative state, idempotency, a customer-visible timeline and a transactional event outbox. See [architecture](docs/architecture.md) and the [runbook](docs/runbook.md).
+
+## Order API
+
+```sh
+curl -i -X POST http://localhost:8080/api/v1/orders \
+  -H 'Idempotency-Key: demo-1' -H 'Content-Type: application/json' \
+  -d '{"customerId":"cust_demo_1","sku":"SKU-42","quantity":2,"siteId":"site_nyc"}'
+curl http://localhost:8080/api/v1/orders
+curl http://localhost:8080/api/v1/orders/<orderId>/timeline
+```
+
+The API has **no authentication**. This is a temporary position tracked in [box1-docs#40](https://github.com/box1-org/box1-docs/issues/40). The contract is [`openapi/order-service.yaml`](https://github.com/box1-org/box1-ops-contracts/blob/main/openapi/order-service.yaml).
+
+## Tests
+
+The default build needs no database or broker, because the CI task has no container runtime. It fetches `box1-ops-contracts` at the commit pinned in `pom.xml`.
+
+```sh
+./mvnw verify -DskipITs=false
+```
+
+Failure scenarios need a container runtime and run real PostgreSQL and Kafka. They do **not** run in CI. Run them before merging any change to persistence or messaging:
+
+```sh
+# Podman only; Docker needs neither variable.
+export DOCKER_HOST=unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')
+export TESTCONTAINERS_RYUK_DISABLED=true
+./mvnw verify -Pcontainers -DskipITs=false
+```
+
+## Local development
 
 Owner: `user:default/mike4263`. Quarkus 3.40.1.1, Java 21, Maven 3.9.16.
 
 Optional integrations selected at creation: PostgreSQL = `true`, Kafka = `true`.
 The integrations add their Quarkus extensions and GitOps resources. PostgreSQL creates a
-service-owned Deployment, Service, PVC, and Secret placeholder; replace its password before
-syncing. Kafka uses the separately managed shared `box1-kafka` Strimzi cluster; service
+service-owned Deployment, Service, PVC, and Secret. Kafka uses the separately managed shared `box1-kafka` Strimzi cluster; service
 onboarding does not create a `KafkaTopic`. The broker address is
 `box1-kafka-kafka-bootstrap.box1-kafka.svc:9092`.
+
+The greeting endpoint stays because the platform smoke task asserts it.
 
 ## Local development
 
