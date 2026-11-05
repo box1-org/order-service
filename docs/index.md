@@ -4,4 +4,7 @@ Transactional state of customer requested orders
 
 ## Overview
 
-The orders come from here
+Owns order commands, authoritative state, idempotency, the timeline and the order event outbox.
+
+- [Architecture](architecture.md)
+- [Runbook](runbook.md)

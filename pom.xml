@@ -16,6 +16,10 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.40.1.1</quarkus.platform.version>
         <skipITs>true</skipITs>
+        <!-- box1-ops-contracts commit that contract tests validate against. -->
+        <contracts.ref>7dcf2909dfccf6e0009504d6542bdb45a647a68b</contracts.ref>
+        <!-- Container-backed tests need a local runtime; the CI task has none. Use -Pcontainers. -->
+        <test.excluded.groups>containers</test.excluded.groups>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
 
@@ -71,6 +75,34 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-messaging-kafka</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-narayana-jta</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-logging-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-opentelemetry</artifactId>
+        </dependency>
         
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -80,6 +112,27 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.9</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -116,7 +169,9 @@
                 <version>${surefire-plugin.version}</version>
                 <configuration>
                     <argLine>@{argLine}</argLine>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
                     <systemPropertyVariables>
+                        <contracts.ref>${contracts.ref}</contracts.ref>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
                         <expected.git.ref>${git.ref}</expected.git.ref>
@@ -136,6 +191,7 @@
                 </executions>
                 <configuration>
                     <argLine>@{argLine}</argLine>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
                     <systemPropertyVariables>
                         <native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
@@ -191,6 +247,10 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>containers</id>
+            <properties><test.excluded.groups></test.excluded.groups></properties>
+        </profile>
         <profile>
             <id>manual-build-git-ref</id>
             <activation><property><name>env.SOURCE_REVISION</name></property></activation>
