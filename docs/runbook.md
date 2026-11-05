@@ -82,7 +82,7 @@ Dead-letter records keep original values, so treat the topic as sensitive as its
 - Flyway applies `src/main/resources/db/migration/` at startup, before readiness.
 - Applied migrations are immutable. Roll back forward, with a corrective migration.
 - Back up with `pg_dump --format=custom` as in `postgres/STORAGE-BACKUP-RESTORE.md` in `box1-ops-contracts`. Restore into a separate database first.
-- Image rollback: revert the promotion commit in `box1-workloads-dev`. V1 stays applied, and the scaffold image ignores those tables.
+- Image rollback: prefer rolling forward with a new release, which passes the security gate. Reverting the promotion commit in `box1-workloads-dev` skips the gate and restores the previous image, which may fail policy: at the time of writing, that is `sha256:fb669bff...83fd`, with 14 policy violations. V1 stays applied. Revert is untested.
 
 ## Resources
 

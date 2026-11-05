@@ -108,9 +108,25 @@ class ContractTest {
                 assertEquals(op.getValue().get("operationId").asText(),
                         generated.path("paths").path(path.getKey()).path(op.getKey()).path("operationId").asText(),
                         path.getKey() + " " + op.getKey());
+                JsonNode served = generated.path("paths").path(path.getKey()).path(op.getKey()).path("responses");
+                java.util.Set<String> expected = new java.util.TreeSet<>();
+                op.getValue().get("responses").fieldNames().forEachRemaining(expected::add);
+                java.util.Set<String> actual = new java.util.TreeSet<>();
+                served.fieldNames().forEachRemaining(actual::add);
+                assertEquals(expected, actual, "responses of " + path.getKey() + " " + op.getKey());
+                for (String code : expected) {
+                    if (code.startsWith("4")) {
+                        assertTrue(served.path(code).path("content").has("application/problem+json"),
+                                code + " of " + path.getKey() + " " + op.getKey());
+                    }
+                }
                 operations++;
             }
         }
         assertEquals(4, operations);
+        JsonNode post = generated.path("paths").path("/api/v1/orders").path("post");
+        assertTrue(post.path("requestBody").path("content").path("application/json").has("examples"));
+        assertTrue(post.path("responses").path("201").path("headers").has("Location"));
+        assertTrue(post.path("responses").path("201").path("content").path("application/json").has("examples"));
     }
 }

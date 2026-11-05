@@ -135,6 +135,40 @@ spec:
         value: "order-service"
       - name: application-namespace
         value: "order-service-dev"
+    # The shared smoke task knows nothing about orders. These checks write nothing:
+    # both POSTs are rejected before persistence, so a broken create still would not show here.
+    - name: order-api-smoke
+      runAfter:
+      - smoke
+      taskSpec:
+        steps:
+        - name: order-api
+          image: registry.access.redhat.com/ubi9/python-311@sha256:d0b35f779ca0ae87deaf17cd1923461904f52d3ef249a53dbd487e02bdabdde6
+          script: |
+            #!/usr/bin/env python3
+            import json, urllib.error, urllib.request
+            base = 'https://order-service-dev.apps.ocp.box1.org'
+            order = {'customerId': 'cust_smoke', 'sku': 'SKU-SMOKE', 'quantity': 1, 'siteId': 'site_smoke'}
+            def call(path, data=None, headers=None):
+                request = urllib.request.Request(base + path, data=data, headers=headers or {})
+                try:
+                    with urllib.request.urlopen(request, timeout=20) as response:
+                        return response.status, response.headers.get('Content-Type', ''), response.read().decode()
+                except urllib.error.HTTPError as error:
+                    return error.code, error.headers.get('Content-Type', ''), error.read().decode()
+            def problem(result, status):
+                assert result[0] == status and 'application/problem+json' in result[1], result
+            status, _, body = call('/api/v1/orders?limit=1')
+            assert status == 200 and isinstance(json.loads(body), list), body
+            problem(call('/api/v1/orders/ord_smoke_missing'), 404)
+            json_body = {'Content-Type': 'application/json'}
+            problem(call('/api/v1/orders', json.dumps(order).encode(), json_body), 400)
+            bad = dict(json_body, **{'Idempotency-Key': 'smoke-invalid'})
+            problem(call('/api/v1/orders', json.dumps({'customerId': 'x'}).encode(), bad), 400)
+            api = json.loads(call('/q/openapi?format=json')[2])
+            responses = api['paths']['/api/v1/orders']['post']['responses']
+            assert {'200', '201', '400', '409'} == set(responses), sorted(responses)
+            print('PASS: order reads, 404 and 400 problems, served OpenAPI responses. No order was written.')
     results:
     - name: image-digest
       value: "$(tasks.build.results.image-digest)"
@@ -147,3 +181,5 @@ spec:
     serviceAccountName: ci-gitops
   - pipelineTaskName: smoke
     serviceAccountName: ci-observe
+  - pipelineTaskName: order-api-smoke
+    serviceAccountName: ci-test
