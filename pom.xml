@@ -25,6 +25,12 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Overrides the Quarkus BOM until it ships a fix for CVE-2026-102554. Remove then. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
