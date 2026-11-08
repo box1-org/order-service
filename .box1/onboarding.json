@@ -2,6 +2,6 @@
   "id": "6bf39f13-333a-4b67-9ff2-c0ff4bcc05c9",
   "name": "order-service",
   "namespace": "order-service-dev",
-  "owner": "user:default/mike4263",
+  "owner": "user:default/mike",
   "templateVersion": "1.1.0"
 }
